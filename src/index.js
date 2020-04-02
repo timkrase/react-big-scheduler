@@ -131,38 +131,15 @@ class Scheduler extends Component {
 
     componentDidMount(props, state){
         this.resolveScrollbarSize();
+        this.updateDataForRendering();
     }
 
-    componentDidUpdate(props, state) {
-        this.resolveScrollbarSize();
-
-        const { schedulerData } = this.props;
-        const { localeMoment, behaviors } = schedulerData;
-        if(schedulerData.getScrollToSpecialMoment() && !!behaviors.getScrollSpecialMomentFunc){
-            if(!!this.schedulerContent && this.schedulerContent.scrollWidth > this.schedulerContent.clientWidth){
-                let start = localeMoment(schedulerData.startDate).startOf('day'),
-                    end = localeMoment(schedulerData.endDate).endOf('day'),
-                    specialMoment = behaviors.getScrollSpecialMomentFunc(schedulerData, start, end);
-                if(specialMoment>= start && specialMoment <= end){
-                    let index = 0;
-                    schedulerData.headers.forEach((item) => {
-                        let header = localeMoment(item.time);
-                        if(specialMoment >= header)
-                            index ++;
-                    })
-                    this.schedulerContent.scrollLeft = (index - 1) * schedulerData.getContentCellWidth();
-
-                    schedulerData.setScrollToSpecialMoment(false);
-                }
-            }
-        }
-    }
-
-    render() {
+    updateDataForRendering() {
         const { schedulerData, leftCustomHeader, rightCustomHeader } = this.props;
         const { renderData, viewType, showAgenda, isEventPerspective, config } = schedulerData;
         const width = schedulerData.getSchedulerWidth();
         const calendarPopoverEnabled = config.calendarPopoverEnabled;
+        console.log(calendarPopoverEnabled);
 
         let dateLabel = schedulerData.getDateLabel();
         let defaultValue = `${viewType}${showAgenda ? 1 : 0}${isEventPerspective ? 1 : 0}`;
@@ -175,10 +152,11 @@ class Scheduler extends Component {
         let tbodyContent = <tr />;
         if (showAgenda) {
             tbodyContent = <AgendaView
-                                {...this.props}
-                            />
+                {...this.props}
+            />
         }
         else {
+
             let resourceTableWidth = schedulerData.getResourceTableWidth();
             let schedulerContainerWidth = width - resourceTableWidth + 1;
             let schedulerWidth = schedulerData.getContentTableWidth() - 1;
@@ -188,10 +166,10 @@ class Scheduler extends Component {
             let displayRenderData = renderData.filter(o => o.render);
             let resourceEventsList = displayRenderData.map((item) => {
                 return <DndResourceEvents
-                                {...this.props}
-                                key={item.slotId}
-                                resourceEvents={item}
-                                dndSource={eventDndSource}
+                    {...this.props}
+                    key={item.slotId}
+                    resourceEvents={item}
+                    dndSource={eventDndSource}
                 />
             });
 
@@ -257,7 +235,7 @@ class Scheduler extends Component {
                                     <div className="scheduler-content">
                                         <table className="scheduler-content-table" >
                                             <tbody>
-                                                {resourceEventsList}
+                                            {resourceEventsList}
                                             </tbody>
                                         </table>
                                     </div>
@@ -283,19 +261,19 @@ class Scheduler extends Component {
                     <Col>
                         <div className='header2-text'>
                             <Icon type="left" style={{marginRight: "8px"}} className="icon-nav"
-                                    onClick={this.goBack}/>
+                                  onClick={this.goBack}/>
                             {
-                            calendarPopoverEnabled
-                                ?
-                                <Popover content={popover} placement="bottom" trigger="click"
-                                        visible={this.state.visible}
-                                        onVisibleChange={this.handleVisibleChange}>
-                                <span className={'header2-text-label'} style={{cursor: 'pointer'}}>{dateLabel}</span>
-                                </Popover>
-                                : <span className={'header2-text-label'}>{dateLabel}</span>
+                                calendarPopoverEnabled
+                                    ?
+                                    <Popover content={popover} placement="bottom" trigger="click"
+                                             visible={this.state.visible}
+                                             onVisibleChange={this.handleVisibleChange}>
+                                        <span className={'header2-text-label'} style={{cursor: 'pointer'}}>{dateLabel}</span>
+                                    </Popover>
+                                    : <span className={'header2-text-label'}>{dateLabel}</span>
                             }
                             <Icon type="right" style={{marginLeft: "8px"}} className="icon-nav"
-                                    onClick={this.goNext}/>
+                                  onClick={this.goNext}/>
                         </div>
                     </Col>
                     <Col>
@@ -308,6 +286,46 @@ class Scheduler extends Component {
             );
         }
 
+        this.setState({
+            schedulerHeader,
+            tbodyContent,
+            width
+        });
+    }
+
+    componentDidUpdate(props, state) {
+        this.resolveScrollbarSize();
+        const { schedulerData } = this.props;
+        const { localeMoment, behaviors } = schedulerData;
+
+        if (schedulerData.getNeedsRenderUpdate()) {
+            this.updateDataForRendering();
+            schedulerData.setNeedsRenderUpdate(false);
+        }
+
+        if(schedulerData.getScrollToSpecialMoment() && !!behaviors.getScrollSpecialMomentFunc){
+            console.log('ScrollTospecialMoment');
+            if(!!this.schedulerContent && this.schedulerContent.scrollWidth > this.schedulerContent.clientWidth){
+                let start = localeMoment(schedulerData.startDate).startOf('day'),
+                    end = localeMoment(schedulerData.endDate).endOf('day'),
+                    specialMoment = behaviors.getScrollSpecialMomentFunc(schedulerData, start, end);
+                if(specialMoment>= start && specialMoment <= end){
+                    let index = 0;
+                    schedulerData.headers.forEach((item) => {
+                        let header = localeMoment(item.time);
+                        if(specialMoment >= header)
+                            index ++;
+                    })
+                    this.schedulerContent.scrollLeft = (index - 1) * schedulerData.getContentCellWidth();
+
+                    schedulerData.setScrollToSpecialMoment(false);
+                }
+            }
+        }
+    }
+
+    render() {
+        const { schedulerHeader, tbodyContent, width } = this.state;
         return (
             <table id="RBS-Scheduler-root" className="scheduler" style={{width: `${width}px`}}>
                 <thead>
@@ -469,7 +487,11 @@ class Scheduler extends Component {
     }
 
     handleVisibleChange = (visible) => {
-        this.setState({visible});
+        const { schedulerData } = this.props;
+        schedulerData.setNeedsRenderUpdate(true);
+        this.setState({
+            visible
+        });
     }
 
     onSelect = (date) => {
